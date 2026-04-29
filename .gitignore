@@ -12,3 +12,4 @@ build/
 cmake-build-debug/
 .DS_Store
 lib
+config/imgui.ini
