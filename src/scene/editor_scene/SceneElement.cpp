@@ -143,6 +143,8 @@ void EditorScene::LitMaterialComponent::add_material_imgui_edit_section(MasterRe
         128.0f
     );
 
+    material_changed |= ImGui::DragFloat2("Texture Scale", &material.texture_scale[0], 0.01f, 0.01f, 100.0f);
+
     ImGui::Spacing();
     if (material_changed) {
         update_instance_data();
@@ -155,6 +157,9 @@ void EditorScene::LitMaterialComponent::update_material_from_json(const json& js
     material.specular_tint = m["specular_tint"];
     material.ambient_tint = m["ambient_tint"];
     material.shininess = m["shininess"];
+    if (m.contains("texture_scale")) {
+        material.texture_scale = m["texture_scale"];
+    }
 }
 
 json EditorScene::LitMaterialComponent::material_into_json() const {
@@ -163,6 +168,7 @@ json EditorScene::LitMaterialComponent::material_into_json() const {
         {"specular_tint", material.specular_tint},
         {"ambient_tint", material.ambient_tint},
         {"shininess", material.shininess},
+        {"texture_scale", material.texture_scale},
     }};
 }
 
