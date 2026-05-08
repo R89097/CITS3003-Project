@@ -23,9 +23,16 @@ uniform vec3 specular_tint;
 uniform vec3 ambient_tint;
 uniform float shininess;
 
+
 #if NUM_PL > 0
 layout (std140) uniform PointLightArray {
     PointLightData point_lights[NUM_PL];
+};
+#endif
+
+#if NUM_DL > 0
+layout (std140) uniform DirectionalLightArray {
+    DirectionalLightData directional_lights[NUM_DL];
 };
 #endif
 
@@ -50,6 +57,9 @@ void main() {
         material
         #if NUM_PL > 0
         ,point_lights
+        #endif
+        #if NUM_DL > 0
+        ,directional_lights
         #endif
     );
 

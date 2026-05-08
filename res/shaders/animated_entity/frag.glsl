@@ -21,6 +21,12 @@ layout (std140) uniform PointLightArray {
 };
 #endif
 
+#if NUM_DL > 0
+layout (std140) uniform DirectionalLightArray {
+    DirectionalLightData directional_lights[NUM_DL];
+};
+#endif
+
 layout(location = 0) out vec4 out_colour;
 
 // Global Data
@@ -52,6 +58,9 @@ void main() {
         material
         #if NUM_PL > 0
         ,point_lights
+        #endif
+        #if NUM_DL > 0
+        ,directional_lights
         #endif
     );
 
