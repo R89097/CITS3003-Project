@@ -127,7 +127,23 @@ void EditorScene::LitMaterialComponent::add_material_imgui_edit_section(MasterRe
     bool material_changed = false;
     ImGui::Text("Material");
 
-    // Add UI controls here
+    material_changed |= ImGui::ColorEdit3("Diffuse Tint", &material.diffuse_tint[0]);
+    material_changed |= ImGui::DragFloat("Diffuse Intensity", &material.diffuse_tint[3], 0.01f, 0.0f, 10.0f);
+
+    material_changed |= ImGui::ColorEdit3("Specular Tint", &material.specular_tint[0]);
+    material_changed |= ImGui::DragFloat("Specular Intensity", &material.specular_tint[3], 0.01f, 0.0f, 10.0f);
+
+    material_changed |= ImGui::ColorEdit3("Ambient Tint", &material.ambient_tint[0]);
+    material_changed |= ImGui::DragFloat("Ambient Intensity", &material.ambient_tint[3], 0.01f, 0.0f, 10.0f);
+
+    material_changed |= ImGui::SliderFloat(
+        "Shininess",
+        &material.shininess,
+        1.0f,
+        128.0f
+    );
+
+    material_changed |= ImGui::DragFloat2("Texture Scale", &material.texture_scale[0], 0.01f, 0.01f, 100.0f);
 
     ImGui::Spacing();
     if (material_changed) {
@@ -141,6 +157,9 @@ void EditorScene::LitMaterialComponent::update_material_from_json(const json& js
     material.specular_tint = m["specular_tint"];
     material.ambient_tint = m["ambient_tint"];
     material.shininess = m["shininess"];
+    if (m.contains("texture_scale")) {
+        material.texture_scale = m["texture_scale"];
+    }
 }
 
 json EditorScene::LitMaterialComponent::material_into_json() const {
@@ -149,6 +168,7 @@ json EditorScene::LitMaterialComponent::material_into_json() const {
         {"specular_tint", material.specular_tint},
         {"ambient_tint", material.ambient_tint},
         {"shininess", material.shininess},
+        {"texture_scale", material.texture_scale},
     }};
 }
 
@@ -157,7 +177,8 @@ void EditorScene::EmissiveMaterialComponent::add_emissive_material_imgui_edit_se
     bool material_changed = false;
     ImGui::Text("Emissive Material");
 
-    // Add UI controls here
+    material_changed |= ImGui::ColorEdit3("Emission Tint", &material.emission_tint[0]);
+    material_changed |= ImGui::DragFloat("Emission Intensity", &material.emission_tint[3], 0.01f, 0.0f, 10.0f);
 
     ImGui::Spacing();
     if (material_changed) {
