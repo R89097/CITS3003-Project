@@ -9,8 +9,6 @@ layout(location = 2) in vec2 texture_coordinate;
 out VertexOut {
     vec3 ws_frag_position;
     vec3 ws_normal;
-    vec3 ws_frag_position;
-    vec3 ws_normal;
     vec2 texture_coordinate;
 } vertex_out;
 
@@ -19,7 +17,6 @@ uniform mat4 model_matrix;
 uniform mat3 normal_matrix;
 
 // Global data
-uniform vec3 ws_view_position;
 uniform mat4 projection_view_matrix;
 
 void main() {

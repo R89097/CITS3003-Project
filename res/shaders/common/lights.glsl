@@ -74,7 +74,7 @@ void directional_light_calculation(DirectionalLightData directional_light, Light
     // Specular
     vec3 ws_halfway_dir = normalize(ws_light_dir + calculation_data.ws_view_dir);
     float specular_factor = pow(max(dot(calculation_data.ws_normal, ws_halfway_dir), 0.0f), shininess);
-    vec3 specular_component = specular_factor * directional_light.colour * attenuation;
+    vec3 specular_component = specular_factor * directional_light.colour;
 
     total_diffuse += diffuse_component;
     total_specular += specular_component;
