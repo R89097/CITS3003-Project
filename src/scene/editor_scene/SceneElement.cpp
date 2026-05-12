@@ -105,6 +105,17 @@ glm::mat4 EditorScene::LocalTransformComponent::calc_model_matrix() const {
     model = glm::scale(model, scale);
 
     return model;
+    glm::mat4 model = glm::mat4(1.0f);
+
+    model = glm::translate(model, position);
+
+    model = glm::rotate(model, euler_rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+    model = glm::rotate(model, euler_rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, euler_rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+
+    model = glm::scale(model, scale);
+
+    return model;
 }
 
 void EditorScene::LocalTransformComponent::update_local_transform_from_json(const json& json) {
@@ -143,6 +154,8 @@ void EditorScene::LitMaterialComponent::add_material_imgui_edit_section(MasterRe
         128.0f
     );
 
+    material_changed |= ImGui::DragFloat2("Texture Scale", &material.texture_scale[0], 0.01f, 0.01f, 100.0f);
+
     ImGui::Spacing();
     if (material_changed) {
         update_instance_data();
@@ -155,6 +168,9 @@ void EditorScene::LitMaterialComponent::update_material_from_json(const json& js
     material.specular_tint = m["specular_tint"];
     material.ambient_tint = m["ambient_tint"];
     material.shininess = m["shininess"];
+    if (m.contains("texture_scale")) {
+        material.texture_scale = m["texture_scale"];
+    }
 }
 
 json EditorScene::LitMaterialComponent::material_into_json() const {
@@ -163,6 +179,7 @@ json EditorScene::LitMaterialComponent::material_into_json() const {
         {"specular_tint", material.specular_tint},
         {"ambient_tint", material.ambient_tint},
         {"shininess", material.shininess},
+        {"texture_scale", material.texture_scale},
     }};
 }
 

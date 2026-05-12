@@ -9,6 +9,8 @@ layout(location = 2) in vec2 texture_coordinate;
 out VertexOut {
     vec3 ws_frag_position;
     vec3 ws_normal;
+    vec3 ws_frag_position;
+    vec3 ws_normal;
     vec2 texture_coordinate;
 } vertex_out;
 
