@@ -169,6 +169,68 @@ void EditorScene::EditorScene::add_imgui_options_section() {
             set_camera_mode(CameraMode::Flying);
         }
         ImGui::Separator();
+
+        if (ImGui::TreeNode("Atmosphere Settings")) {
+            static bool fog_enabled = false;
+            static float fog_density = 0.0f;
+            static glm::vec4 fog_colour = glm::vec4(0.7f, 0.7f, 0.75f, 1.0f);
+
+            bool atmosphere_changed = false;
+            atmosphere_changed |= ImGui::Checkbox("Enable Fog", &fog_enabled);
+            atmosphere_changed |= ImGui::SliderFloat("Fog Density", &fog_density, 0.0f, 1.0f);
+            atmosphere_changed |= ImGui::ColorEdit4("Fog Colour", &fog_colour.x);
+
+            if (atmosphere_changed) {
+                float active_fog_density = fog_enabled ? fog_density : 0.0f;
+
+                glm::vec4 normal_light_colour = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+                glm::vec4 normal_ambient_colour = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+                glm::vec4 light_colour = glm::mix(normal_light_colour, fog_colour, active_fog_density);
+                glm::vec4 ambient_colour = glm::mix(normal_ambient_colour, fog_colour, active_fog_density);
+
+                for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
+                    visit_children_and_root(iter, [&](SceneElement& element) {
+                        auto* light = dynamic_cast<PointLightElement*>(&element);
+                        if (light != nullptr) {
+                            light->light->colour = light_colour;
+                            light->update_instance_data();
+                        }
+
+                        auto* orbiting_light = dynamic_cast<OrbitingPointLightElement*>(&element);
+                        if (orbiting_light != nullptr) {
+                            orbiting_light->light->colour = light_colour;
+                            orbiting_light->update_instance_data();
+                        }
+
+                        auto* entity = dynamic_cast<EntityElement*>(&element);
+                        if (entity != nullptr) {
+                            entity->material.ambient_tint = ambient_colour;
+                            entity->update_instance_data();
+                        }
+
+                        auto* animated = dynamic_cast<AnimatedEntityElement*>(&element);
+                        if (animated != nullptr) {
+                            animated->material.ambient_tint = ambient_colour;
+                            animated->update_instance_data();
+                        }
+
+                        auto* emissive = dynamic_cast<EmissiveEntityElement*>(&element);
+                        if (emissive != nullptr) {
+                            emissive->material.emission_tint = glm::mix(
+                                glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+                                fog_colour,
+                                active_fog_density * 0.4f
+                            );
+                            emissive->update_instance_data();
+                        }
+                    });
+                }
+            }
+
+            ImGui::TreePop();
+        }
+        ImGui::Separator();
     }
 }
 
