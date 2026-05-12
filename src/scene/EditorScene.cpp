@@ -153,6 +153,144 @@ void EditorScene::EditorScene::add_imgui_options_section() {
             set_camera_mode(CameraMode::Flying);
         }
         ImGui::Separator();
+        // Task I, add in some ennvironment features 
+        }
+        ImGui::Separator();
+
+        ImGui::Text("Atmosphere Controller");
+
+        bool atmosphere_changed = false;
+
+        atmosphere_changed |= ImGui::SliderFloat("Time of Day", &time_of_day, 0.0f, 1.0f);
+        atmosphere_changed |= ImGui::SliderFloat("Fog Density", &fog_density, 0.0f, 1.0f);
+
+        if (ImGui::Button("Sunset Preset")) {
+            time_of_day = 0.5f;
+            fog_density = 0.0f;
+            apply_atmosphere_controller();
+        }
+
+        if (ImGui::Button("Foggy Preset")) {
+            time_of_day = 0.35f;
+            fog_density = 0.7f;
+            apply_atmosphere_controller();
+        }
+
+        if (atmosphere_changed) {
+            apply_atmosphere_controller();
+        }
+}
+//Task I 
+void EditorScene::EditorScene::apply_sunset_preset() {
+    for (auto& element : *scene_root) {
+        auto* light = dynamic_cast<PointLightElement*>(element.get());
+        if (light != nullptr) {
+            light->light->colour = glm::vec4(1.0f, 0.65f, 0.3f, 1.0f);
+            light->update_instance_data();
+        }
+
+        auto* entity = dynamic_cast<EntityElement*>(element.get());
+        if (entity != nullptr) {
+            entity->material.ambient_tint = glm::vec4(1.0f, 0.45f, 0.25f, 0.55f);
+            entity->update_instance_data();
+        }
+
+        auto* animated = dynamic_cast<AnimatedEntityElement*>(element.get());
+        if (animated != nullptr) {
+            animated->material.ambient_tint = glm::vec4(1.0f, 0.45f, 0.25f, 0.55f);
+            animated->update_instance_data();
+        }
+
+        auto* emissive = dynamic_cast<EmissiveEntityElement*>(element.get());
+        if (emissive != nullptr) {
+            emissive->material.emission_tint.a = 1.3f;
+            emissive->update_instance_data();
+        }
+    }
+}
+
+void EditorScene::EditorScene::apply_foggy_preset() {
+    for (auto& element : *scene_root) {
+        auto* light = dynamic_cast<PointLightElement*>(element.get());
+        if (light != nullptr) {
+            light->light->colour = glm::vec4(0.8f, 0.8f, 0.85f, 0.6f);
+            light->update_instance_data();
+        }
+
+        auto* entity = dynamic_cast<EntityElement*>(element.get());
+        if (entity != nullptr) {
+            entity->material.ambient_tint = glm::vec4(0.7f, 0.7f, 0.75f, 0.45f);
+            entity->update_instance_data();
+        }
+
+        auto* animated = dynamic_cast<AnimatedEntityElement*>(element.get());
+        if (animated != nullptr) {
+            animated->material.ambient_tint = glm::vec4(0.7f, 0.7f, 0.75f, 0.45f);
+            animated->update_instance_data();
+        }
+
+        auto* emissive = dynamic_cast<EmissiveEntityElement*>(element.get());
+        if (emissive != nullptr) {
+            emissive->material.emission_tint.a = 1.15f;
+            emissive->update_instance_data();
+        }
+    }
+}
+
+void EditorScene::EditorScene::apply_atmosphere_controller() {
+    glm::vec4 day_light     = glm::vec4(1.0f, 0.95f, 0.8f, 1.0f);
+    glm::vec4 sunset_light  = glm::vec4(1.0f, 0.65f, 0.3f, 0.85f);
+    glm::vec4 night_light   = glm::vec4(0.25f, 0.35f, 0.75f, 0.6f);
+
+    glm::vec4 day_ambient    = glm::vec4(1.0f, 1.0f, 1.0f, 0.8f);
+    glm::vec4 sunset_ambient = glm::vec4(1.0f, 0.45f, 0.25f, 0.55f);
+    glm::vec4 night_ambient  = glm::vec4(0.15f, 0.2f, 0.45f, 0.35f);
+
+    glm::vec4 light_colour;
+    glm::vec4 ambient_colour;
+
+    if (time_of_day < 0.5f) {
+        float t = time_of_day / 0.5f;
+        light_colour = glm::mix(day_light, sunset_light, t);
+        ambient_colour = glm::mix(day_ambient, sunset_ambient, t);
+    } else {
+        float t = (time_of_day - 0.5f) / 0.5f;
+        light_colour = glm::mix(sunset_light, night_light, t);
+        ambient_colour = glm::mix(sunset_ambient, night_ambient, t);
+    }
+
+    if (fog_density > 0.0f) {
+        glm::vec4 fog_light = glm::vec4(0.8f, 0.8f, 0.85f, 0.6f);
+        glm::vec4 fog_ambient = glm::vec4(0.7f, 0.7f, 0.75f, 0.45f);
+
+        light_colour = glm::mix(light_colour, fog_light, fog_density);
+        ambient_colour = glm::mix(ambient_colour, fog_ambient, fog_density);
+    }
+
+    for (auto& element : *scene_root) {
+        auto* light = dynamic_cast<PointLightElement*>(element.get());
+        if (light != nullptr) {
+            light->light->colour = light_colour;
+            light->update_instance_data();
+        }
+
+        auto* entity = dynamic_cast<EntityElement*>(element.get());
+        if (entity != nullptr) {
+            entity->material.ambient_tint = ambient_colour;
+            entity->update_instance_data();
+        }
+
+        auto* animated = dynamic_cast<AnimatedEntityElement*>(element.get());
+        if (animated != nullptr) {
+            animated->material.ambient_tint = ambient_colour;
+            animated->update_instance_data();
+        }
+
+        auto* emissive = dynamic_cast<EmissiveEntityElement*>(element.get());
+        if (emissive != nullptr) {
+            emissive->material.emission_tint.a = 1.0f + fog_density * 0.4f;
+            emissive->update_instance_data();
+        }
     }
 }
 
