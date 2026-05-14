@@ -1,5 +1,3 @@
-
-
 #include "OrbitingPointLightElement.h"
 
 #include <algorithm>
@@ -43,6 +41,10 @@ std::unique_ptr<EditorScene::OrbitingPointLightElement> EditorScene::OrbitingPoi
         )
     );
 
+    light_element->orbit_colours = {
+        glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}
+    };
+
     light_element->update_instance_data();
     return light_element;
 }
@@ -55,6 +57,11 @@ std::unique_ptr<EditorScene::OrbitingPointLightElement> EditorScene::OrbitingPoi
     light_element->orbit_tilt_angle = j["orbit_tilt_angle"];
     light_element->orbit_duration = j["orbit_duration"];
     light_element->light->colour = j["colour"];
+    if (j.contains("orbit_colours")) {
+        light_element->orbit_colours = j["orbit_colours"];
+    } else {
+        light_element->orbit_colours = {light_element->light->colour};
+    }
     light_element->visible = j["visible"];
     light_element->visual_scale = j["visual_scale"];
 
@@ -69,6 +76,7 @@ json EditorScene::OrbitingPointLightElement::into_json() const {
         {"orbit_tilt_angle", orbit_tilt_angle},
         {"orbit_duration",   orbit_duration},
         {"colour",           light->colour},
+        {"orbit_colours",    orbit_colours},
         {"visible",          visible},
         {"visual_scale",     visual_scale},
     };
@@ -87,6 +95,29 @@ glm::vec3 EditorScene::OrbitingPointLightElement::current_position(float time_se
     };
 
     return orbit_center + orbit_offset;
+}
+
+glm::vec4 EditorScene::OrbitingPointLightElement::current_colour(float time_seconds) const {
+    if (orbit_colours.empty()) {
+        return glm::vec4{1.0f};
+    }
+
+    if (orbit_colours.size() == 1) {
+        return orbit_colours[0];
+    }
+
+    float safe_duration = std::max(orbit_duration, 0.001f);
+    float progress = std::fmod(time_seconds / safe_duration, 1.0f);
+    if (progress < 0.0f) {
+        progress += 1.0f;
+    }
+
+    float scaled_progress = progress * static_cast<float>(orbit_colours.size());
+    int first_index = static_cast<int>(std::floor(scaled_progress)) % static_cast<int>(orbit_colours.size());
+    int second_index = (first_index + 1) % static_cast<int>(orbit_colours.size());
+    float blend = scaled_progress - std::floor(scaled_progress);
+
+    return glm::mix(orbit_colours[first_index], orbit_colours[second_index], blend);
 }
 
 void EditorScene::OrbitingPointLightElement::add_imgui_edit_section(MasterRenderScene& render_scene, const SceneContext& scene_context) {
@@ -109,11 +140,34 @@ void EditorScene::OrbitingPointLightElement::add_imgui_edit_section(MasterRender
     ImGui::DragDisableCursor(scene_context.window);
     ImGui::Spacing();
 
-    ImGui::Text("Light Properties");
-    transformUpdated |= ImGui::ColorEdit3("Colour", &light->colour[0]);
-    ImGui::Spacing();
-    transformUpdated |= ImGui::DragFloat("Intensity", &light->colour.a, 0.01f, 0.0f, FLT_MAX);
-    ImGui::DragDisableCursor(scene_context.window);
+    ImGui::Text("Colour Stops");
+    if (orbit_colours.empty()) {
+        orbit_colours.push_back(light->colour);
+        transformUpdated = true;
+    }
+
+    for (int i = 0; i < static_cast<int>(orbit_colours.size()); ++i) {
+        ImGui::PushID(i);
+
+        transformUpdated |= ImGui::ColorEdit3("Colour", &orbit_colours[i][0]);
+        transformUpdated |= ImGui::DragFloat("Intensity", &orbit_colours[i].a, 0.01f, 0.0f, FLT_MAX);
+        ImGui::DragDisableCursor(scene_context.window);
+
+        if (orbit_colours.size() > 1 && ImGui::Button("Remove Colour")) {
+            orbit_colours.erase(orbit_colours.begin() + i);
+            transformUpdated = true;
+            ImGui::PopID();
+            break;
+        }
+
+        ImGui::Separator();
+        ImGui::PopID();
+    }
+
+    if (ImGui::Button("Add Colour")) {
+        orbit_colours.push_back(orbit_colours.back());
+        transformUpdated = true;
+    }
 
     ImGui::Spacing();
     ImGui::Text("Visuals");
@@ -128,7 +182,9 @@ void EditorScene::OrbitingPointLightElement::add_imgui_edit_section(MasterRender
 }
 
 void EditorScene::OrbitingPointLightElement::update_instance_data() {
-    glm::vec3 position = current_position(static_cast<float>(glfwGetTime()));
+    float time_seconds = static_cast<float>(glfwGetTime());
+    glm::vec3 position = current_position(time_seconds);
+    light->colour = current_colour(time_seconds);
     transform = glm::translate(position);
 
     if (!EditorScene::is_null(parent)) {
