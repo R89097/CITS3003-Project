@@ -227,40 +227,13 @@ void EditorScene::EditorScene::add_imgui_options_section() {
                     ambient_colour = glm::mix(ambient_colour, fog_ambient, active_fog_density);
                 }
 
+                // Apply light colour only to orbiting lights (time-of-day affects them)
                 for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
                     visit_children_and_root(iter, [&](SceneElement& element) {
-                        auto* light = dynamic_cast<PointLightElement*>(&element);
-                        if (light != nullptr) {
-                            light->light->colour = light_colour;
-                            light->update_instance_data();
-                        }
-
                         auto* orbiting_light = dynamic_cast<OrbitingPointLightElement*>(&element);
                         if (orbiting_light != nullptr) {
                             orbiting_light->light->colour = light_colour;
                             orbiting_light->update_instance_data();
-                        }
-
-                        auto* entity = dynamic_cast<EntityElement*>(&element);
-                        if (entity != nullptr) {
-                            entity->material.ambient_tint = ambient_colour;
-                            entity->update_instance_data();
-                        }
-
-                        auto* animated = dynamic_cast<AnimatedEntityElement*>(&element);
-                        if (animated != nullptr) {
-                            animated->material.ambient_tint = ambient_colour;
-                            animated->update_instance_data();
-                        }
-
-                        auto* emissive = dynamic_cast<EmissiveEntityElement*>(&element);
-                        if (emissive != nullptr) {
-                            emissive->material.emission_tint = glm::mix(
-                                glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
-                                fog_colour,
-                                active_fog_density * 0.4f
-                            );
-                            emissive->update_instance_data();
                         }
                     });
                 }
