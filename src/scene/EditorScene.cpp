@@ -227,12 +227,12 @@ void EditorScene::EditorScene::add_imgui_options_section() {
                     ambient_colour = glm::mix(ambient_colour, fog_ambient, active_fog_density);
                 }
 
-                // Apply light colour only to orbiting lights (time-of-day affects them)
+            
                 for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
                     visit_children_and_root(iter, [&](SceneElement& element) {
                         auto* orbiting_light = dynamic_cast<OrbitingPointLightElement*>(&element);
                         if (orbiting_light != nullptr) {
-                            orbiting_light->light->colour = light_colour;
+                            orbiting_light->orbit_colours = { light_colour };
                             orbiting_light->update_instance_data();
                         }
                     });
