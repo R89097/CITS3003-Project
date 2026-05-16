@@ -4,8 +4,6 @@
 in VertexOut {
     vec3 ws_frag_position;
     vec3 ws_normal;
-    vec3 ws_frag_position;
-    vec3 ws_normal;
     vec2 texture_coordinate;
 } frag_in;
 
@@ -72,11 +70,6 @@ void main() {
         frag_in.texture_coordinate
     );
 
-    float distance_to_camera = length(ws_view_position - frag_in.ws_frag_position);
-    float fog_amount = clamp(distance_to_camera / 25.0f, 0.0f, 1.0f);
-    vec3 fog_colour = vec3(0.65f, 0.70f, 0.75f);
-    resolved_lighting = mix(resolved_lighting, fog_colour, fog_amount * 0.45f);
     out_colour = vec4(resolved_lighting, 1.0f);
-
     out_colour.rgb = pow(out_colour.rgb, vec3(inverse_gamma));
 }

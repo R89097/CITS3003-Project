@@ -80,15 +80,6 @@ namespace EditorScene {
         /// Main save/load calls, which use the current save_path or pop-up a native file dialog
         void save_to_json_file();
         void load_from_json_file(const SceneContext& scene_context);
-
-        //Task I, add in some environment
-        void apply_sunset_preset();
-        void apply_foggy_preset();
-
-        void apply_atmosphere_controller();
-
-        float time_of_day = 0.5f;
-        float fog_density = 0.0f;
     };
 }
 
