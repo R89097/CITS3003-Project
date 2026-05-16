@@ -38,6 +38,9 @@ std::unique_ptr<EditorScene::PointLightElement> EditorScene::PointLightElement::
 
     light_element->position = j["position"];
     light_element->light->colour = j["colour"];
+    if (j.contains("attenuation")) {
+        light_element->light->attenuation = j["attenuation"];
+    }
     light_element->visible = j["visible"];
     light_element->visual_scale = j["visual_scale"];
 
@@ -49,6 +52,7 @@ json EditorScene::PointLightElement::into_json() const {
     return {
         {"position",     position},
         {"colour",       light->colour},
+        {"attenuation",  light->attenuation},
         {"visible",      visible},
         {"visual_scale", visual_scale},
     };
@@ -68,6 +72,15 @@ void EditorScene::PointLightElement::add_imgui_edit_section(MasterRenderScene& r
     transformUpdated |= ImGui::ColorEdit3("Colour", &light->colour[0]);
     ImGui::Spacing();
     ImGui::DragFloat("Intensity", &light->colour.a, 0.01f, 0.0f, FLT_MAX);
+    ImGui::DragDisableCursor(scene_context.window);
+
+    ImGui::Spacing();
+    ImGui::Text("Attenuation");
+    transformUpdated |= ImGui::DragFloat("Constant", &light->attenuation[0], 0.001f, 0.0f, FLT_MAX);
+    ImGui::DragDisableCursor(scene_context.window);
+    transformUpdated |= ImGui::DragFloat("Linear", &light->attenuation[1], 0.0001f, 0.0f, FLT_MAX);
+    ImGui::DragDisableCursor(scene_context.window);
+    transformUpdated |= ImGui::DragFloat("Quadratic", &light->attenuation[2], 0.00001f, 0.0f, FLT_MAX);
     ImGui::DragDisableCursor(scene_context.window);
 
     ImGui::Spacing();
