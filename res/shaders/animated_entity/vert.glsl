@@ -24,6 +24,9 @@ uniform mat4 bone_transforms[BONE_TRANSFORMS];
 // Global data
 uniform mat4 projection_view_matrix;
 
+// Material properties
+uniform vec2 texture_scale;
+
 void main() {
     // Transform vertices
     float sum = dot(bone_weights, vec4(1.0f));
@@ -41,11 +44,9 @@ void main() {
     vec3 ws_position = (animation_matrix * vec4(vertex_position, 1.0f)).xyz;
     vec3 ws_normal = normalize(normal_matrix * normal);
 
-    gl_Position = projection_view_matrix * vec4(ws_position, 1.0f);
-
-    //change to per frag 
-    
-    vertex_out.texture_coordinate = texture_coordinate;
+    vertex_out.texture_coordinate = texture_coordinate * texture_scale;
     vertex_out.ws_frag_position = ws_position;
     vertex_out.ws_normal = ws_normal;
+
+    gl_Position = projection_view_matrix * vec4(ws_position, 1.0f);
 }
