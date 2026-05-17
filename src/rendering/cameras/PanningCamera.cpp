@@ -47,7 +47,7 @@ void PanningCamera::update(const Window& window, float dt, bool controls_enabled
     distance = clamp(distance, MIN_DISTANCE, MAX_DISTANCE);
 
     glm::vec3 direction;
-    direction.x = std::cos(pitch) * std::sin(yaw);
+    direction.x = -std::cos(pitch) * std::sin(yaw);
     direction.y = std::sin(pitch);
     direction.z = std::cos(pitch) * std::cos(yaw);
 
