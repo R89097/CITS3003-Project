@@ -6,6 +6,8 @@
 #include "rendering/cameras/PanningCamera.h"
 #include "rendering/cameras/FlyingCamera.h"
 
+#include <GLFW/glfw3.h>
+
 #include "editor_scene/EntityElement.h"
 #include "editor_scene/AnimatedEntityElement.h"
 #include "editor_scene/EmissiveEntityElement.h"
@@ -174,55 +176,106 @@ void EditorScene::EditorScene::add_imgui_options_section() {
             static bool fog_enabled = false;
             static float fog_density = 0.0f;
             static glm::vec4 fog_colour = glm::vec4(0.7f, 0.7f, 0.75f, 1.0f);
+            static float time_of_day = 1.0f; // 0.0 = day->sunset->night progression
+            static bool auto_sync_time_of_day = false;
+            static int auto_sync_selected = -1; // index into orbiting_names, -1 = none
 
             bool atmosphere_changed = false;
             atmosphere_changed |= ImGui::Checkbox("Enable Fog", &fog_enabled);
+            atmosphere_changed |= ImGui::SliderFloat("Time of Day", &time_of_day, 0.0f, 1.0f);
+            atmosphere_changed |= ImGui::Checkbox("Auto Sync Time of Day to Orbiting Light", &auto_sync_time_of_day);
+
+            // Collect orbiting lights for selection
+            std::vector<OrbitingPointLightElement*> orbiting_ptrs;
+            std::vector<std::string> orbiting_names;
+            for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
+                visit_children_and_root(iter, [&](SceneElement& element) {
+                    auto* orbiting_light = dynamic_cast<OrbitingPointLightElement*>(&element);
+                    if (orbiting_light != nullptr) {
+                        orbiting_ptrs.push_back(orbiting_light);
+                        orbiting_names.push_back(Formatter() << orbiting_light->name.c_str() << "##" << (void*) orbiting_light);
+                    }
+                });
+            }
+
+            if (!orbiting_names.empty()) {
+                std::vector<const char*> cstrs;
+                cstrs.reserve(orbiting_names.size()+1);
+                cstrs.push_back("None");
+                for (auto &s : orbiting_names) cstrs.push_back(s.c_str());
+                int display_index = auto_sync_selected + 1; // shift so that -1 => 0 (None)
+                if (ImGui::Combo("Sun Source", &display_index, cstrs.data(), (int)cstrs.size())) {
+                    auto_sync_selected = display_index - 1;
+                    atmosphere_changed = true;
+                }
+            }
+
+            // If auto-sync is enabled and a valid orbiting light is selected, compute time_of_day from its orbital height
+            if (auto_sync_time_of_day && auto_sync_selected >= 0 && auto_sync_selected < (int)orbiting_ptrs.size()) {
+                OrbitingPointLightElement* src = orbiting_ptrs[auto_sync_selected];
+                float t = static_cast<float>(glfwGetTime());
+                glm::vec3 pos = src->current_position(t);
+                float local_y = pos.y - src->orbit_center.y;
+                float denom = src->orbit_radius > 0.0001f ? src->orbit_radius : 1.0f;
+                float normalized = glm::clamp(local_y / denom, -1.0f, 1.0f);
+                time_of_day = (1.0f - normalized) * 0.5f; // maps +1 -> 0 (day), 0->0.5 (sunset), -1->1 (night)
+                atmosphere_changed = true;
+            }
             atmosphere_changed |= ImGui::SliderFloat("Fog Density", &fog_density, 0.0f, 1.0f);
             atmosphere_changed |= ImGui::ColorEdit4("Fog Colour", &fog_colour.x);
+
+            if (ImGui::Button("Sunset Preset")) {
+                time_of_day = 0.5f;
+                fog_density = 0.0f;
+                atmosphere_changed = true;
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Foggy Preset")) {
+                time_of_day = 0.35f;
+                fog_density = 0.7f;
+                atmosphere_changed = true;
+            }
 
             if (atmosphere_changed) {
                 float active_fog_density = fog_enabled ? fog_density : 0.0f;
 
-                glm::vec4 normal_light_colour = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-                glm::vec4 normal_ambient_colour = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+                glm::vec4 day_light     = glm::vec4(1.0f, 0.95f, 0.8f, 1.0f);
+                glm::vec4 sunset_light  = glm::vec4(1.0f, 0.65f, 0.3f, 0.85f);
+                glm::vec4 night_light   = glm::vec4(0.25f, 0.35f, 0.75f, 0.6f);
 
-                glm::vec4 light_colour = glm::mix(normal_light_colour, fog_colour, active_fog_density);
-                glm::vec4 ambient_colour = glm::mix(normal_ambient_colour, fog_colour, active_fog_density);
+                glm::vec4 day_ambient    = glm::vec4(1.0f, 1.0f, 1.0f, 0.8f);
+                glm::vec4 sunset_ambient = glm::vec4(1.0f, 0.45f, 0.25f, 0.55f);
+                glm::vec4 night_ambient  = glm::vec4(0.15f, 0.2f, 0.45f, 0.35f);
 
+                glm::vec4 light_colour;
+                glm::vec4 ambient_colour;
+
+                if (time_of_day < 0.5f) {
+                    float t = time_of_day / 0.5f;
+                    light_colour = glm::mix(day_light, sunset_light, t);
+                    ambient_colour = glm::mix(day_ambient, sunset_ambient, t);
+                } else {
+                    float t = (time_of_day - 0.5f) / 0.5f;
+                    light_colour = glm::mix(sunset_light, night_light, t);
+                    ambient_colour = glm::mix(sunset_ambient, night_ambient, t);
+                }
+
+                if (active_fog_density > 0.0f) {
+                    glm::vec4 fog_light = glm::vec4(0.8f, 0.8f, 0.85f, 0.6f);
+                    glm::vec4 fog_ambient = glm::vec4(0.7f, 0.7f, 0.75f, 0.45f);
+
+                    light_colour = glm::mix(light_colour, fog_light, active_fog_density);
+                    ambient_colour = glm::mix(ambient_colour, fog_ambient, active_fog_density);
+                }
+
+            
                 for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
                     visit_children_and_root(iter, [&](SceneElement& element) {
-                        auto* light = dynamic_cast<PointLightElement*>(&element);
-                        if (light != nullptr) {
-                            light->light->colour = light_colour;
-                            light->update_instance_data();
-                        }
-
                         auto* orbiting_light = dynamic_cast<OrbitingPointLightElement*>(&element);
                         if (orbiting_light != nullptr) {
-                            orbiting_light->light->colour = light_colour;
+                            orbiting_light->orbit_colours = { light_colour };
                             orbiting_light->update_instance_data();
-                        }
-
-                        auto* entity = dynamic_cast<EntityElement*>(&element);
-                        if (entity != nullptr) {
-                            entity->material.ambient_tint = ambient_colour;
-                            entity->update_instance_data();
-                        }
-
-                        auto* animated = dynamic_cast<AnimatedEntityElement*>(&element);
-                        if (animated != nullptr) {
-                            animated->material.ambient_tint = ambient_colour;
-                            animated->update_instance_data();
-                        }
-
-                        auto* emissive = dynamic_cast<EmissiveEntityElement*>(&element);
-                        if (emissive != nullptr) {
-                            emissive->material.emission_tint = glm::mix(
-                                glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
-                                fog_colour,
-                                active_fog_density * 0.4f
-                            );
-                            emissive->update_instance_data();
                         }
                     });
                 }

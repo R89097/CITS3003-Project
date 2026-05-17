@@ -57,6 +57,9 @@ std::unique_ptr<EditorScene::OrbitingPointLightElement> EditorScene::OrbitingPoi
     light_element->orbit_tilt_angle = j["orbit_tilt_angle"];
     light_element->orbit_duration = j["orbit_duration"];
     light_element->light->colour = j["colour"];
+    if (j.contains("attenuation")) {
+        light_element->light->attenuation = j["attenuation"];
+    }
     if (j.contains("orbit_colours")) {
         light_element->orbit_colours = j["orbit_colours"];
     } else {
@@ -76,6 +79,7 @@ json EditorScene::OrbitingPointLightElement::into_json() const {
         {"orbit_tilt_angle", orbit_tilt_angle},
         {"orbit_duration",   orbit_duration},
         {"colour",           light->colour},
+        {"attenuation",      light->attenuation},
         {"orbit_colours",    orbit_colours},
         {"visible",          visible},
         {"visual_scale",     visual_scale},
@@ -168,6 +172,15 @@ void EditorScene::OrbitingPointLightElement::add_imgui_edit_section(MasterRender
         orbit_colours.push_back(orbit_colours.back());
         transformUpdated = true;
     }
+
+    ImGui::Spacing();
+    ImGui::Text("Attenuation");
+    transformUpdated |= ImGui::DragFloat("Constant", &light->attenuation[0], 0.001f, 0.0f, FLT_MAX);
+    ImGui::DragDisableCursor(scene_context.window);
+    transformUpdated |= ImGui::DragFloat("Linear", &light->attenuation[1], 0.0001f, 0.0f, FLT_MAX);
+    ImGui::DragDisableCursor(scene_context.window);
+    transformUpdated |= ImGui::DragFloat("Quadratic", &light->attenuation[2], 0.00001f, 0.0f, FLT_MAX);
+    ImGui::DragDisableCursor(scene_context.window);
 
     ImGui::Spacing();
     ImGui::Text("Visuals");
