@@ -6,10 +6,13 @@
 #include "rendering/cameras/PanningCamera.h"
 #include "rendering/cameras/FlyingCamera.h"
 
+#include <GLFW/glfw3.h>
+
 #include "editor_scene/EntityElement.h"
 #include "editor_scene/AnimatedEntityElement.h"
 #include "editor_scene/EmissiveEntityElement.h"
 #include "editor_scene/PointLightElement.h"
+#include "editor_scene/OrbitingPointLightElement.h"
 #include "editor_scene/DirectionalLightElement.h"
 #include "editor_scene/GroupElement.h"
 #include "scene/SceneContext.h"
@@ -101,8 +104,9 @@ void EditorScene::EditorScene::open(const SceneContext& scene_context) {
 
     /// All the light generators, new light types must be registered here to be able to be created in the UI
     light_generators = {
-        {PointLightElement::ELEMENT_TYPE_NAME,       [](const SceneContext& scene_context, ElementRef parent) { return PointLightElement::new_default(scene_context, parent); }},
-        {DirectionalLightElement::ELEMENT_TYPE_NAME, [](const SceneContext& scene_context, ElementRef parent) { return DirectionalLightElement::new_default(scene_context, parent); }},
+        {PointLightElement::ELEMENT_TYPE_NAME,         [](const SceneContext& scene_context, ElementRef parent) { return PointLightElement::new_default(scene_context, parent); }},
+        {OrbitingPointLightElement::ELEMENT_TYPE_NAME, [](const SceneContext& scene_context, ElementRef parent) { return OrbitingPointLightElement::new_default(scene_context, parent); }},
+        {DirectionalLightElement::ELEMENT_TYPE_NAME,   [](const SceneContext& scene_context, ElementRef parent) { return DirectionalLightElement::new_default(scene_context, parent); }},
     };
 
     /// All the element generators, new element types must be registered here to be able to be loaded from json
@@ -110,8 +114,9 @@ void EditorScene::EditorScene::open(const SceneContext& scene_context) {
         {EntityElement::ELEMENT_TYPE_NAME,         [](const SceneContext& scene_context, ElementRef parent, const json& j) { return EntityElement::from_json(scene_context, parent, j); }},
         {AnimatedEntityElement::ELEMENT_TYPE_NAME, [](const SceneContext& scene_context, ElementRef parent, const json& j) { return AnimatedEntityElement::from_json(scene_context, parent, j); }},
         {EmissiveEntityElement::ELEMENT_TYPE_NAME, [](const SceneContext& scene_context, ElementRef parent, const json& j) { return EmissiveEntityElement::from_json(scene_context, parent, j); }},
-        {PointLightElement::ELEMENT_TYPE_NAME,     [](const SceneContext& scene_context, ElementRef parent, const json& j) { return PointLightElement::from_json(scene_context, parent, j); }},
-        {DirectionalLightElement::ELEMENT_TYPE_NAME, [](const SceneContext& scene_context, ElementRef parent, const json& j) { return DirectionalLightElement::from_json(scene_context, parent, j); }},
+        {PointLightElement::ELEMENT_TYPE_NAME,         [](const SceneContext& scene_context, ElementRef parent, const json& j) { return PointLightElement::from_json(scene_context, parent, j); }},
+        {OrbitingPointLightElement::ELEMENT_TYPE_NAME, [](const SceneContext& scene_context, ElementRef parent, const json& j) { return OrbitingPointLightElement::from_json(scene_context, parent, j); }},
+        {DirectionalLightElement::ELEMENT_TYPE_NAME,   [](const SceneContext& scene_context, ElementRef parent, const json& j) { return DirectionalLightElement::from_json(scene_context, parent, j); }},
         {GroupElement::ELEMENT_TYPE_NAME,          [](const SceneContext&, ElementRef parent, const json& j) { return GroupElement::from_json(parent, j); }},
     };
 }
@@ -134,6 +139,16 @@ std::pair<TickResponseType, std::shared_ptr<SceneInterface>> EditorScene::Editor
         }
     }
 
+    /// Update orbiting point lights every frame so their position changes over time.
+    for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
+        visit_children_and_root(iter, [](SceneElement& element) {
+            auto* orbiting_light = dynamic_cast<OrbitingPointLightElement*>(&element);
+            if (orbiting_light != nullptr && orbiting_light->enabled) {
+                orbiting_light->update_instance_data();
+            }
+        });
+    }
+
     /// If ImGUI should be enabled, then add the two windows
     if (scene_context.imgui_enabled) {
         add_imgui_selection_editor(scene_context);
@@ -154,6 +169,119 @@ void EditorScene::EditorScene::add_imgui_options_section() {
         }
         if (ImGui::RadioButton("Flying Camera", camera_mode == CameraMode::Flying)) {
             set_camera_mode(CameraMode::Flying);
+        }
+        ImGui::Separator();
+
+        if (ImGui::TreeNode("Atmosphere Settings")) {
+            static bool fog_enabled = false;
+            static float fog_density = 0.0f;
+            static glm::vec4 fog_colour = glm::vec4(0.7f, 0.7f, 0.75f, 1.0f);
+            static float time_of_day = 1.0f; // 0.0 = day->sunset->night progression
+            static bool auto_sync_time_of_day = false;
+            static int auto_sync_selected = -1; // index into orbiting_names, -1 = none
+
+            bool atmosphere_changed = false;
+            atmosphere_changed |= ImGui::Checkbox("Enable Fog", &fog_enabled);
+            atmosphere_changed |= ImGui::SliderFloat("Time of Day", &time_of_day, 0.0f, 1.0f);
+            atmosphere_changed |= ImGui::Checkbox("Auto Sync Time of Day to Orbiting Light", &auto_sync_time_of_day);
+
+            // Collect orbiting lights for selection
+            std::vector<OrbitingPointLightElement*> orbiting_ptrs;
+            std::vector<std::string> orbiting_names;
+            for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
+                visit_children_and_root(iter, [&](SceneElement& element) {
+                    auto* orbiting_light = dynamic_cast<OrbitingPointLightElement*>(&element);
+                    if (orbiting_light != nullptr) {
+                        orbiting_ptrs.push_back(orbiting_light);
+                        orbiting_names.push_back(Formatter() << orbiting_light->name.c_str() << "##" << (void*) orbiting_light);
+                    }
+                });
+            }
+
+            if (!orbiting_names.empty()) {
+                std::vector<const char*> cstrs;
+                cstrs.reserve(orbiting_names.size()+1);
+                cstrs.push_back("None");
+                for (auto &s : orbiting_names) cstrs.push_back(s.c_str());
+                int display_index = auto_sync_selected + 1; // shift so that -1 => 0 (None)
+                if (ImGui::Combo("Sun Source", &display_index, cstrs.data(), (int)cstrs.size())) {
+                    auto_sync_selected = display_index - 1;
+                    atmosphere_changed = true;
+                }
+            }
+
+            // If auto-sync is enabled and a valid orbiting light is selected, compute time_of_day from its orbital height
+            if (auto_sync_time_of_day && auto_sync_selected >= 0 && auto_sync_selected < (int)orbiting_ptrs.size()) {
+                OrbitingPointLightElement* src = orbiting_ptrs[auto_sync_selected];
+                float t = static_cast<float>(glfwGetTime());
+                glm::vec3 pos = src->current_position(t);
+                float local_y = pos.y - src->orbit_center.y;
+                float denom = src->orbit_radius > 0.0001f ? src->orbit_radius : 1.0f;
+                float normalized = glm::clamp(local_y / denom, -1.0f, 1.0f);
+                time_of_day = (1.0f - normalized) * 0.5f; // maps +1 -> 0 (day), 0->0.5 (sunset), -1->1 (night)
+                atmosphere_changed = true;
+            }
+            atmosphere_changed |= ImGui::SliderFloat("Fog Density", &fog_density, 0.0f, 1.0f);
+            atmosphere_changed |= ImGui::ColorEdit4("Fog Colour", &fog_colour.x);
+
+            if (ImGui::Button("Sunset Preset")) {
+                time_of_day = 0.5f;
+                fog_density = 0.0f;
+                atmosphere_changed = true;
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Foggy Preset")) {
+                time_of_day = 0.35f;
+                fog_density = 0.7f;
+                atmosphere_changed = true;
+            }
+
+            if (atmosphere_changed) {
+                float active_fog_density = fog_enabled ? fog_density : 0.0f;
+
+                glm::vec4 day_light     = glm::vec4(1.0f, 0.95f, 0.8f, 1.0f);
+                glm::vec4 sunset_light  = glm::vec4(1.0f, 0.65f, 0.3f, 0.85f);
+                glm::vec4 night_light   = glm::vec4(0.25f, 0.35f, 0.75f, 0.6f);
+
+                glm::vec4 day_ambient    = glm::vec4(1.0f, 1.0f, 1.0f, 0.8f);
+                glm::vec4 sunset_ambient = glm::vec4(1.0f, 0.45f, 0.25f, 0.55f);
+                glm::vec4 night_ambient  = glm::vec4(0.15f, 0.2f, 0.45f, 0.35f);
+
+                glm::vec4 light_colour;
+                glm::vec4 ambient_colour;
+
+                if (time_of_day < 0.5f) {
+                    float t = time_of_day / 0.5f;
+                    light_colour = glm::mix(day_light, sunset_light, t);
+                    ambient_colour = glm::mix(day_ambient, sunset_ambient, t);
+                } else {
+                    float t = (time_of_day - 0.5f) / 0.5f;
+                    light_colour = glm::mix(sunset_light, night_light, t);
+                    ambient_colour = glm::mix(sunset_ambient, night_ambient, t);
+                }
+
+                if (active_fog_density > 0.0f) {
+                    glm::vec4 fog_light = glm::vec4(0.8f, 0.8f, 0.85f, 0.6f);
+                    glm::vec4 fog_ambient = glm::vec4(0.7f, 0.7f, 0.75f, 0.45f);
+
+                    light_colour = glm::mix(light_colour, fog_light, active_fog_density);
+                    ambient_colour = glm::mix(ambient_colour, fog_ambient, active_fog_density);
+                }
+
+            
+                for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
+                    visit_children_and_root(iter, [&](SceneElement& element) {
+                        auto* orbiting_light = dynamic_cast<OrbitingPointLightElement*>(&element);
+                        if (orbiting_light != nullptr) {
+                            orbiting_light->orbit_colours = { light_colour };
+                            orbiting_light->update_instance_data();
+                        }
+                    });
+                }
+            }
+
+            ImGui::TreePop();
         }
         ImGui::Separator();
     }

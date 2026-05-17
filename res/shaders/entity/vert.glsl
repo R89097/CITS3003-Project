@@ -16,18 +16,19 @@ out VertexOut {
 uniform mat4 model_matrix;
 uniform mat3 normal_matrix;
 
+// Material properties
+uniform vec2 texture_scale;
+
 // Global data
-uniform vec3 ws_view_position;
 uniform mat4 projection_view_matrix;
 
 void main() {
     // Transform vertices
     vec3 ws_position = (model_matrix * vec4(vertex_position, 1.0f)).xyz;
     vec3 ws_normal = normalize(normal_matrix * normal);
-
-    gl_Position = projection_view_matrix * vec4(ws_position, 1.0f);
-
+    vertex_out.texture_coordinate = texture_coordinate * texture_scale;
     vertex_out.ws_frag_position = ws_position;
     vertex_out.ws_normal = ws_normal;
-    vertex_out.texture_coordinate = texture_coordinate;
+
+    gl_Position = projection_view_matrix * vec4(ws_position, 1.0f);
 }

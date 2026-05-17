@@ -7,6 +7,9 @@
 cits3003_project
 cits3003_project.exe
 .DS*
+lib/
 build/
 cmake-build-debug/
 .DS_Store
+lib
+config/imgui.ini
