@@ -18,7 +18,7 @@ ln -s /path/to/original_project/lib lib
 ### Step 2: Build the project
 ```bash
 rm -rf build
-cmake -S . -B build
+cmake -S . -B build -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build build
 ```
 
