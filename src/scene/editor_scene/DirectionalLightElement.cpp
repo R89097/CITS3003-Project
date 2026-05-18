@@ -4,6 +4,7 @@
 
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/component_wise.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include "rendering/imgui/ImGuiManager.h"
 #include "scene/SceneContext.h"
@@ -18,7 +19,7 @@ std::unique_ptr<EditorScene::DirectionalLightElement> EditorScene::DirectionalLi
             glm::vec4{1.0f}
         ),
         EmissiveEntityRenderer::Entity::create(
-            scene_context.model_loader.load_from_file<EmissiveEntityRenderer::VertexData>("sphere.obj"),
+            scene_context.model_loader.load_from_file<EmissiveEntityRenderer::VertexData>("pointer.obj"),
             EmissiveEntityRenderer::InstanceData{
                 glm::mat4{}, // Set via update_instance_data()
                 EmissiveEntityRenderer::EmissiveEntityMaterial{
@@ -69,7 +70,7 @@ void EditorScene::DirectionalLightElement::add_imgui_edit_section(MasterRenderSc
     ImGui::Text("Light Properties");
     transformUpdated |= ImGui::ColorEdit3("Colour", &light->colour[0]);
     ImGui::Spacing();
-    ImGui::DragFloat("Intensity", &light->colour.a, 0.01f, 0.0f, FLT_MAX);
+    transformUpdated |= ImGui::DragFloat("Intensity", &light->colour.a, 0.01f, 0.0f, FLT_MAX);
     ImGui::DragDisableCursor(scene_context.window);
 
     ImGui::Spacing();
@@ -94,7 +95,11 @@ void EditorScene::DirectionalLightElement::update_instance_data() {
 
     // Directional light has no true position, so this visual marker is placed
     // in the opposite direction to show where the light is coming from.
-    transform = glm::translate(-light->direction * 2.0f);
+    // The pointer model is rotated so that it points along the real light direction.
+    glm::vec3 default_pointer_direction = glm::vec3{0.0f, 1.0f, 0.0f};
+    glm::vec3 target_pointer_direction = light->direction;
+    glm::quat pointer_rotation = glm::rotation(default_pointer_direction, target_pointer_direction);
+    transform = glm::translate(-light->direction * 2.0f) * glm::toMat4(pointer_rotation);
 
     if (!EditorScene::is_null(parent)) {
         // Post multiply by transform so that local transformations are applied first
