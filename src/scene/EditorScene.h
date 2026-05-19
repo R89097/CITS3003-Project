@@ -9,6 +9,7 @@
 
 #include "editor_scene/SceneElement.h"
 #include "scene/SceneContext.h"
+#include "rendering/renders/WeatherRenderer.h"
 
 /// A namespace for all the things related to the EditorScene, since it's rather complicated
 namespace EditorScene {
@@ -46,6 +47,17 @@ namespace EditorScene {
         /// The current save path
         std::optional<std::string> save_path{};
 
+        struct WeatherSettings {
+            bool rain_enabled = false;
+            bool snow_enabled = false;
+            int target_entity_index = 0;
+            int particle_count = 300;
+            float fall_speed = 1.8f;
+            float spawn_radius = 0.22f;
+            float earth_radius = 1.0f;
+            float rain_length = 0.08f;
+        } weather_settings{};
+
         // The RenderScene of the Scene
         MasterRenderScene render_scene{};
     public:
@@ -68,6 +80,10 @@ namespace EditorScene {
 
         /// A helper for switching camera mode
         void set_camera_mode(CameraMode new_camera_mode);
+
+        /// Helpers for the atmosphere weather particle system
+        void update_weather_scene(float delta_time);
+        void reset_weather_particle(Rendering::WeatherRenderer::Entity& weather_entity, Rendering::WeatherRenderer::Particle& particle);
 
         /// Helpers to recursively iterator down the scene tree
         void visit_children(ElementRef root, const std::function<void(SceneElement&)>& visit);

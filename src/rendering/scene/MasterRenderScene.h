@@ -10,17 +10,20 @@
 #include "rendering/renders/EntityRenderer.h"
 #include "rendering/renders/AnimatedEntityRenderer.h"
 #include "rendering/renders/EmissiveEntityRenderer.h"
+#include "rendering/renders/WeatherRenderer.h"
 
 /// The master render scene, which holds a copy of each renderers RenderScene,
 /// as well as the light scene, and offers an interface for adding/removing entities and lights.
 /// Also holds the animator, which offers an API for controlling animation.
 class MasterRenderScene {
+public:
     EntityRenderer::RenderScene entity_scene{};
     AnimatedEntityRenderer::RenderScene animated_entity_scene{};
     EmissiveEntityRenderer::RenderScene emissive_entity_scene{};
+    Rendering::WeatherRenderer::RenderScene weather_scene{};
 
     LightScene light_scene{};
-public:
+
     MasterRenderScene() = default;
 
     Animator animator{};

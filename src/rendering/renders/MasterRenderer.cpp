@@ -4,7 +4,7 @@
 #include "rendering/imgui/ImGuiManager.h"
 #include "scene/SceneContext.h"
 
-MasterRenderer::MasterRenderer() : entity_renderer(), animated_entity_renderer(), emissive_entity_renderer(), render_settings() {
+MasterRenderer::MasterRenderer() : entity_renderer(), animated_entity_renderer(), emissive_entity_renderer(), weather_renderer(), render_settings() {
     glEnable(GL_DEPTH_TEST);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glEnable(GL_CULL_FACE);
@@ -23,6 +23,7 @@ void MasterRenderer::render_scene(MasterRenderScene& render_scene, const SceneCo
     entity_renderer.render(render_scene.entity_scene, render_scene.light_scene);
     animated_entity_renderer.render(render_scene.animated_entity_scene, render_scene.light_scene);
     emissive_entity_renderer.render(render_scene.emissive_entity_scene);
+    weather_renderer.render(render_scene.weather_scene);
 }
 
 void MasterRenderer::sync() {

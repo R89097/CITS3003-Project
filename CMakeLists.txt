@@ -113,6 +113,7 @@ add_executable(cits3003_project
         src/rendering/renders/EntityRenderer.cpp
         src/rendering/renders/AnimatedEntityRenderer.cpp
         src/rendering/renders/EmissiveEntityRenderer.cpp
+        src/rendering/renders/WeatherRenderer.cpp
         src/rendering/cameras/PanningCamera.cpp
         src/rendering/cameras/FlyingCamera.cpp
         src/rendering/imgui/ImGuiImpl.cpp

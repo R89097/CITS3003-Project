@@ -121,7 +121,7 @@ void EditorScene::EditorScene::open(const SceneContext& scene_context) {
     };
 }
 
-std::pair<TickResponseType, std::shared_ptr<SceneInterface>> EditorScene::EditorScene::tick(float /*delta_time*/, const SceneContext& scene_context) {
+std::pair<TickResponseType, std::shared_ptr<SceneInterface>> EditorScene::EditorScene::tick(float delta_time, const SceneContext& scene_context) {
     /// If the `Esc` key was pressed this tick, then tell the scene manager to exit
     if (scene_context.window.was_key_pressed(GLFW_KEY_ESCAPE)) {
         return {TickResponseType::Exit, nullptr};
@@ -148,6 +148,8 @@ std::pair<TickResponseType, std::shared_ptr<SceneInterface>> EditorScene::Editor
             }
         });
     }
+
+    update_weather_scene(delta_time);
 
     /// If ImGUI should be enabled, then add the two windows
     if (scene_context.imgui_enabled) {
@@ -180,10 +182,51 @@ void EditorScene::EditorScene::add_imgui_options_section() {
             static bool auto_sync_time_of_day = false;
             static int auto_sync_selected = -1; // index into orbiting_names, -1 = none
 
+
             bool atmosphere_changed = false;
             atmosphere_changed |= ImGui::Checkbox("Enable Fog", &fog_enabled);
             atmosphere_changed |= ImGui::SliderFloat("Time of Day", &time_of_day, 0.0f, 1.0f);
             atmosphere_changed |= ImGui::Checkbox("Auto Sync Time of Day to Orbiting Light", &auto_sync_time_of_day);
+
+            ImGui::Separator();
+            ImGui::Text("Weather");
+            ImGui::Checkbox("Enable Rain", &weather_settings.rain_enabled);
+            ImGui::Checkbox("Enable Snow", &weather_settings.snow_enabled);
+
+            std::vector<EntityElement*> weather_entity_ptrs;
+            std::vector<std::string> weather_entity_names;
+            for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
+                visit_children_and_root(iter, [&](SceneElement& element) {
+                    auto* entity = dynamic_cast<EntityElement*>(&element);
+                    if (entity != nullptr) {
+                        weather_entity_ptrs.push_back(entity);
+                        weather_entity_names.push_back(Formatter() << entity->name.c_str() << "##weather" << (void*) entity);
+                    }
+                });
+            }
+
+            if (!weather_entity_names.empty()) {
+                std::vector<const char*> weather_entity_cstrs;
+                weather_entity_cstrs.reserve(weather_entity_names.size());
+                for (auto& name : weather_entity_names) {
+                    weather_entity_cstrs.push_back(name.c_str());
+                }
+
+                if (weather_settings.target_entity_index >= (int) weather_entity_cstrs.size()) {
+                    weather_settings.target_entity_index = 0;
+                }
+
+                ImGui::Combo("Weather Target Entity", &weather_settings.target_entity_index, weather_entity_cstrs.data(), (int) weather_entity_cstrs.size());
+            } else {
+                ImGui::Text("No entity available for weather target");
+                weather_settings.target_entity_index = 0;
+            }
+
+            ImGui::SliderInt("Weather Particle Count", &weather_settings.particle_count, 20, 1500);
+            ImGui::SliderFloat("Weather Fall Speed", &weather_settings.fall_speed, 0.1f, 8.0f);
+            ImGui::SliderFloat("Weather Spawn Radius", &weather_settings.spawn_radius, 0.02f, 1.0f);
+            ImGui::SliderFloat("Rain Length", &weather_settings.rain_length, 0.01f, 0.3f);
+            ImGui::Separator();
 
             // Collect orbiting lights for selection
             std::vector<OrbitingPointLightElement*> orbiting_ptrs;
@@ -763,4 +806,81 @@ void EditorScene::EditorScene::load_from_json_file(const SceneContext& scene_con
 
         tinyfd_messageBox("Failed to open File", "See Console For Error", "ok", "error", 1);
     }
+}
+
+void EditorScene::EditorScene::update_weather_scene(float delta_time) {
+    render_scene.weather_scene.entities.clear();
+
+    if (!weather_settings.rain_enabled && !weather_settings.snow_enabled) {
+        return;
+    }
+
+    glm::vec3 target_position = glm::vec3(0.0f, 1.6f, 0.0f);
+    int entity_index = 0;
+
+    for (auto iter = scene_root->begin(); iter != scene_root->end(); ++iter) {
+        visit_children_and_root(iter, [&](SceneElement& element) {
+            auto* entity = dynamic_cast<EntityElement*>(&element);
+            if (entity != nullptr) {
+                if (entity_index == weather_settings.target_entity_index) {
+                    target_position = entity->position;
+                }
+                entity_index++;
+            }
+        });
+    }
+
+    auto create_weather_entity = [&](Rendering::WeatherRenderer::WeatherType type) {
+        Rendering::WeatherRenderer::Entity weather_entity{};
+        weather_entity.enabled = true;
+        weather_entity.weather_type = type;
+        weather_entity.particle_count = weather_settings.particle_count;
+        weather_entity.fall_speed = weather_settings.fall_speed;
+        weather_entity.spawn_radius = weather_settings.spawn_radius;
+        weather_entity.earth_radius = weather_settings.earth_radius;
+        weather_entity.rain_length = weather_settings.rain_length;
+        weather_entity.target_position = target_position;
+        weather_entity.particles.resize(static_cast<std::size_t>(weather_settings.particle_count));
+
+        for (auto& particle : weather_entity.particles) {
+            reset_weather_particle(weather_entity, particle);
+            glm::vec3 fall_direction = glm::normalize(-particle.position);
+            particle.position += fall_direction * particle.speed * delta_time;
+        }
+
+        render_scene.weather_scene.entities.push_back(std::move(weather_entity));
+    };
+
+    if (weather_settings.rain_enabled) {
+        create_weather_entity(Rendering::WeatherRenderer::WeatherType::Rain);
+    }
+
+    if (weather_settings.snow_enabled) {
+        create_weather_entity(Rendering::WeatherRenderer::WeatherType::Snow);
+    }
+}
+
+void EditorScene::EditorScene::reset_weather_particle(Rendering::WeatherRenderer::Entity& weather_entity, Rendering::WeatherRenderer::Particle& particle) {
+    glm::vec3 cloud_position = weather_entity.target_position;
+    if (glm::length(cloud_position) < 0.0001f) {
+        cloud_position = glm::vec3(0.0f, 1.6f, 0.0f);
+    }
+
+    glm::vec3 outward = glm::normalize(cloud_position);
+    glm::vec3 fall_direction = -outward;
+
+    glm::vec3 tangent_a = glm::cross(outward, glm::vec3(0.0f, 1.0f, 0.0f));
+    if (glm::length(tangent_a) < 0.0001f) {
+        tangent_a = glm::cross(outward, glm::vec3(1.0f, 0.0f, 0.0f));
+    }
+    tangent_a = glm::normalize(tangent_a);
+    glm::vec3 tangent_b = glm::normalize(glm::cross(outward, tangent_a));
+
+    float offset_a = ((float) std::rand() / (float) RAND_MAX - 0.5f) * 2.0f * weather_entity.spawn_radius;
+    float offset_b = ((float) std::rand() / (float) RAND_MAX - 0.5f) * 2.0f * weather_entity.spawn_radius;
+    float below_cloud = ((float) std::rand() / (float) RAND_MAX) * weather_entity.spawn_radius * 0.4f;
+
+    particle.position = cloud_position + tangent_a * offset_a + tangent_b * offset_b + fall_direction * below_cloud;
+    particle.speed = weather_entity.fall_speed;
+    particle.random_offset = ((float) std::rand() / (float) RAND_MAX) * 100.0f;
 }

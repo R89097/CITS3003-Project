@@ -4,6 +4,7 @@
 #include "utility/SyncManager.h"
 #include "EntityRenderer.h"
 #include "EmissiveEntityRenderer.h"
+#include "WeatherRenderer.h"
 #include "rendering/scene/MasterRenderScene.h"
 #include "system_interfaces/WindowManager.h"
 #include "scene/SceneInterface.h"
@@ -14,6 +15,7 @@ class MasterRenderer {
     EntityRenderer::EntityRenderer entity_renderer;
     AnimatedEntityRenderer::AnimatedEntityRenderer animated_entity_renderer;
     EmissiveEntityRenderer::EmissiveEntityRenderer emissive_entity_renderer;
+    Rendering::WeatherRenderer weather_renderer;
     SyncManager sync_manager;
 
     struct RenderSettings {
