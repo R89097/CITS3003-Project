@@ -195,6 +195,37 @@ void EditorScene::OrbitingPointLightElement::add_imgui_edit_section(MasterRender
 }
 
 void EditorScene::OrbitingPointLightElement::update_instance_data() {
+    glm::vec3 position = current_position(static_cast<float>(glfwGetTime()));
+
+    float safe_duration = std::max(orbit_duration, 0.001f);
+    float cycle = std::fmod(static_cast<float>(glfwGetTime()) / orbit_duration, 1.0f);
+
+    glm::vec4 sunrise_colour = glm::vec4(1.0f, 0.55f, 0.25f, 0.8f);
+    glm::vec4 day_colour     = glm::vec4(1.0f, 0.95f, 0.8f, 1.0f);
+    glm::vec4 sunset_colour  = glm::vec4(1.0f, 0.4f, 0.2f, 0.75f);
+    glm::vec4 night_colour   = glm::vec4(0.2f, 0.3f, 0.65f, 0.45f);
+
+    glm::vec4 dynamic_colour;
+
+    if (cycle < 0.25f) {
+        float t = cycle / 0.25f;
+        dynamic_colour = glm::mix(sunrise_colour, day_colour, t);
+    }
+    else if (cycle < 0.5f) {
+        float t = (cycle - 0.25f) / 0.25f;
+        dynamic_colour = glm::mix(day_colour, sunset_colour, t);
+    }
+    else if (cycle < 0.75f) {
+        float t = (cycle - 0.5f) / 0.25f;
+        dynamic_colour = glm::mix(sunset_colour, night_colour, t);
+    }
+    else {
+        float t = (cycle - 0.75f) / 0.25f;
+        dynamic_colour = glm::mix(night_colour, sunrise_colour, t);
+    }
+
+    light->colour = dynamic_colour;
+    
     float time_seconds = static_cast<float>(glfwGetTime());
     glm::vec3 position = current_position(time_seconds);
     light->colour = current_colour(time_seconds);
