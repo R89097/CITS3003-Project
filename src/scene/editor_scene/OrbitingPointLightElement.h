@@ -6,6 +6,8 @@
 #include "SceneElement.h"
 #include "scene/SceneContext.h"
 
+#include <vector>
+
 namespace EditorScene {
     class OrbitingPointLightElement : public SceneElement {
     public:
@@ -21,6 +23,10 @@ namespace EditorScene {
 
         bool visible = true;
         float visual_scale = 1.0f;
+
+        // Colours are evenly distributed around the orbit.
+        // Users can add duplicate colours to make one colour appear for longer.
+        std::vector<glm::vec4> orbit_colours;
 
         // This is still stored/rendered as a normal PointLight.
         // The only difference is that its position will be updated every frame.
@@ -51,6 +57,7 @@ namespace EditorScene {
         [[nodiscard]] json into_json() const override;
 
         [[nodiscard]] glm::vec3 current_position(float time_seconds) const;
+        [[nodiscard]] glm::vec4 current_colour(float time_seconds) const;
 
         void add_imgui_edit_section(MasterRenderScene& render_scene, const SceneContext& scene_context) override;
 

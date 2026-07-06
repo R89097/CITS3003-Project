@@ -75,6 +75,5 @@ void main() {
     vec3 fog_colour = vec3(0.65f, 0.70f, 0.75f);
     resolved_lighting = mix(resolved_lighting, fog_colour, fog_amount * 0.12f);
     out_colour = vec4(resolved_lighting, 1.0f);
-
     out_colour.rgb = pow(out_colour.rgb, vec3(inverse_gamma));
 }

@@ -16,6 +16,7 @@ PanningCamera::PanningCamera(float distance, glm::vec3 focus_point, float pitch,
 void PanningCamera::update(const Window& window, float dt, bool controls_enabled) {
     if (controls_enabled) {
         bool ctrl_is_pressed = window.is_key_pressed(GLFW_KEY_LEFT_CONTROL) || window.is_key_pressed(GLFW_KEY_RIGHT_CONTROL);
+        bool shift_is_pressed = window.is_key_pressed(GLFW_KEY_LEFT_SHIFT) || window.is_key_pressed(GLFW_KEY_RIGHT_SHIFT);
 
         bool resetSeq = false;
         if (window.was_key_pressed(GLFW_KEY_R) && !ctrl_is_pressed) {
@@ -29,10 +30,15 @@ void PanningCamera::update(const Window& window, float dt, bool controls_enabled
             auto y_basis = glm::vec3{inverse_view_matrix[1]};
 
             auto pan = window.get_mouse_delta(GLFW_MOUSE_BUTTON_MIDDLE);
+            if (shift_is_pressed) {
+                pan += window.get_mouse_delta(GLFW_MOUSE_BUTTON_RIGHT);
+            }
             focus_point += (x_basis * (float) -pan.x + y_basis * (float) pan.y) * PAN_SPEED * dt * distance / (float) window.get_window_height();
 
-            pitch -= PITCH_SPEED * (float) window.get_mouse_delta(GLFW_MOUSE_BUTTON_RIGHT).y;
-            yaw -= YAW_SPEED * (float) window.get_mouse_delta(GLFW_MOUSE_BUTTON_RIGHT).x;
+            if (!shift_is_pressed) {
+                pitch -= PITCH_SPEED * (float) window.get_mouse_delta(GLFW_MOUSE_BUTTON_RIGHT).y;
+                yaw -= YAW_SPEED * (float) window.get_mouse_delta(GLFW_MOUSE_BUTTON_RIGHT).x;
+            }
             distance -= ZOOM_SCROLL_MULTIPLIER * ZOOM_SPEED * window.get_scroll_delta();
 
             auto is_dragging = window.is_mouse_pressed(GLFW_MOUSE_BUTTON_RIGHT) || window.is_mouse_pressed(GLFW_MOUSE_BUTTON_MIDDLE);
@@ -47,7 +53,7 @@ void PanningCamera::update(const Window& window, float dt, bool controls_enabled
     distance = clamp(distance, MIN_DISTANCE, MAX_DISTANCE);
 
     glm::vec3 direction;
-    direction.x = std::cos(pitch) * std::sin(yaw);
+    direction.x = -std::cos(pitch) * std::sin(yaw);
     direction.y = std::sin(pitch);
     direction.z = std::cos(pitch) * std::cos(yaw);
 
